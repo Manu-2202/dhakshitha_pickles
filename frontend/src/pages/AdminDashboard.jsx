@@ -135,9 +135,19 @@ export default function AdminDashboard() {
 
   const handleUpdateOrderStatus = async (id, newStatus) => {
     try {
-      await API.put(`/orders/${id}/status`, { status: newStatus });
+      const res = await API.put(`/orders/${id}/status`, { status: newStatus });
+      const data = res.data;
       fetchData();
-    } catch { alert('Failed to update status'); }
+
+      // Show WhatsApp notification result
+      const wa = data?._whatsappResult;
+      if (wa?.sent)    addToast(`✅ WhatsApp sent to customer for status: ${newStatus}`);
+      else if (wa?.skipped) addToast(`ℹ️ WhatsApp skipped — customer opted out`);
+      else if (wa?.failed)  addToast(`⚠️ WhatsApp FAILED: ${wa.error || 'Unknown error'}`);
+    } catch (err) {
+      addToast('❌ Failed to update order status');
+      console.error('Status update error:', err);
+    }
   };
 
   const createCoupon = async (e) => {
@@ -240,8 +250,17 @@ export default function AdminDashboard() {
               <div className="table-card-header"><h3>Customer Orders</h3><span className="table-count">{orders.length} orders</span></div>
               <div className="dash-table-wrap">
                 <table className="dash-table">
-                  <thead><tr><th>Track ID</th><th>Customer</th><th>Delivery Address</th><th>Total</th><th>Payment</th><th>Status</th></tr></thead>
-                  <tbody>{orders.map(o => (
+                  <thead><tr><th>Track ID</th><th>Customer</th><th>Delivery Address</th><th>Total</th><th>Payment</th><th>Status</th><th>WhatsApp</th></tr></thead>
+                  <tbody>{orders.map(o => {
+                    const waIcon = o.wantsWhatsappUpdates
+                      ? (o.whatsappStatus === 'sent'    ? '✅ Sent'
+                        : o.whatsappStatus === 'failed' ? '❌ Failed'
+                        : o.whatsappStatus === 'skipped'? '⏭️ Skipped'
+                        : '⏳ Pending')
+                      : '🔕 Off';
+                    const waColor = o.whatsappStatus === 'sent' ? '#16a34a'
+                      : o.whatsappStatus === 'failed' ? '#dc2626' : '#888';
+                    return (
                     <tr key={o._id}>
                       <td>
                         <div className="order-id" style={{color: 'var(--primary)', fontWeight: 'bold'}}>
@@ -254,9 +273,9 @@ export default function AdminDashboard() {
                       <td className="price-cell"><strong>₹{o.total}</strong></td>
                       <td><span className={`stock-pill ${o.paymentDetails?.isPaid ? 'in' : 'out'}`}>{o.paymentDetails?.isPaid ? '✓ Paid' : '⏳ Pending'}</span></td>
                       <td><select value={o.status} onChange={(e) => handleUpdateOrderStatus(o._id, e.target.value)} className="status-select" style={{ borderColor: STATUS_COLORS[o.status] || '#ccc' }}>{['Ordered','Packed','Waiting for Transport','Out for Delivery','Delivered','Cancelled'].map(s => (<option key={s} value={s}>{s}</option>))}</select></td>
-
+                      <td><span style={{ fontSize: '0.82rem', color: waColor, fontWeight: '600' }}>{waIcon}</span></td>
                     </tr>
-                  ))}</tbody>
+                  )})}</tbody>
                 </table>
               </div>
             </div>
