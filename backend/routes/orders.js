@@ -33,13 +33,15 @@ router.post('/', async (req, res) => {
       category: i.category || '',
     }));
 
-    // Auto-increment tracking ID
-    const lastOrder = await Order.findOne().sort({ createdAt: -1 }).lean();
-    let trackNum = 1001;
-    if (lastOrder?.trackingId) {
-      const n = parseInt(lastOrder.trackingId.replace('DP-', ''));
-      if (!isNaN(n)) trackNum = n + 1;
+    // Auto-increment tracking ID — find true MAX across all orders to avoid E11000
+    const allTrackOrders = await Order.find({ trackingId: { $regex: /^DP-\d+$/ } })
+      .select('trackingId').lean();
+    let maxNum = 1000;
+    for (const o of allTrackOrders) {
+      const n = parseInt((o.trackingId || '').replace('DP-', ''));
+      if (!isNaN(n) && n > maxNum) maxNum = n;
     }
+    const trackNum = maxNum + 1;
 
     const newOrder = new Order({
       trackingId:          `DP-${trackNum}`,
@@ -59,10 +61,25 @@ router.post('/', async (req, res) => {
       status: 'Ordered',
     });
 
-    await newOrder.save();
+    // Save with retry — if another order grabbed the same trackNum between our query and save,
+    // increment and try again (handles race conditions on concurrent orders)
+    let savedOrder;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        newOrder.trackingId = `DP-${trackNum + attempt}`;
+        savedOrder = await newOrder.save();
+        break;
+      } catch (dupErr) {
+        if (dupErr.code === 11000 && attempt < 4) {
+          console.warn(`[Orders] TrackingId DP-${trackNum + attempt} taken, retrying with DP-${trackNum + attempt + 1}`);
+          continue;
+        }
+        throw dupErr;
+      }
+    }
 
     // Deduct stock (non-blocking — don't fail order if this errors)
-    for (const item of newOrder.items) {
+    for (const item of savedOrder.items) {
       try {
         if (!item.pickleId) continue;
         const pickle = await Pickle.findById(item.pickleId);
@@ -77,7 +94,7 @@ router.post('/', async (req, res) => {
       }
     }
 
-    res.status(201).json(newOrder);
+    res.status(201).json(savedOrder);
   } catch (err) {
     console.error('[Orders] Create failed:', err.message, err.errors || '');
     // Return the actual validation message so frontend can display it
@@ -150,6 +167,24 @@ router.post('/:id/retry-whatsapp', async (req, res) => {
     order.whatsappStatus = result.sent ? 'sent' : result.skipped ? 'skipped' : 'failed';
     await order.save();
     res.json({ success: true, result });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// ── ADMIN: Get WhatsApp message text for manual send ──────────
+router.get('/:id/wa-message', async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id).lean();
+    if (!order) return res.status(404).json({ message: 'Order not found' });
+    const { buildMessageText } = require('../services/whatsapp');
+    const text = buildMessageText(order);
+    const rawPhone = order.billingDetails?.phone || '';
+    let phone = rawPhone.replace(/\D/g, '');
+    if (phone.startsWith('0')) phone = phone.slice(1);
+    if (phone.length === 10) phone = '91' + phone;
+    if (!phone.startsWith('91')) phone = '91' + phone;
+    res.json({ phone, text, waUrl: `https://wa.me/${phone}?text=${encodeURIComponent(text)}` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

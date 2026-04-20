@@ -155,5 +155,6 @@ module.exports = {
   isClientReady,
   generatePairingCode,
   sendLoginLink,
-  sendOrderStatusMessage
+  sendOrderStatusMessage,
+  buildMessageText: buildMessage,  // exported so admin can build wa.me links
 };

@@ -250,7 +250,7 @@ export default function AdminDashboard() {
               <div className="table-card-header"><h3>Customer Orders</h3><span className="table-count">{orders.length} orders</span></div>
               <div className="dash-table-wrap">
                 <table className="dash-table">
-                  <thead><tr><th>Track ID</th><th>Customer</th><th>Delivery Address</th><th>Total</th><th>Payment</th><th>Status</th><th>WhatsApp</th></tr></thead>
+                  <thead><tr><th>Track ID</th><th>Customer</th><th>Delivery Address</th><th>Items</th><th>Total</th><th>Payment</th><th>Status</th><th>WhatsApp</th></tr></thead>
                   <tbody>{orders.map(o => {
                     const waIcon = o.wantsWhatsappUpdates
                       ? (o.whatsappStatus === 'sent'    ? '✅ Sent'
@@ -260,20 +260,53 @@ export default function AdminDashboard() {
                       : '🔕 Off';
                     const waColor = o.whatsappStatus === 'sent' ? '#16a34a'
                       : o.whatsappStatus === 'failed' ? '#dc2626' : '#888';
+                    const tId = o.trackingId || `DP-${o._id.slice(-4).toUpperCase()}`;
+                    let phone = (o.billingDetails?.phone || '').replace(/\D/g, '');
+                    if (phone.startsWith('0')) phone = phone.slice(1);
+                    if (phone.length === 10) phone = '91' + phone;
+                    if (!phone.startsWith('91')) phone = '91' + phone;
+                    const itemLines = (o.items||[]).map(i => `• ${i.name} (${i.weight}) ×${i.quantity}`).join('\n');
+                    const waMsg = `📦 *Dhakshitha Pickles*\n\nHi ${o.billingDetails?.firstName || 'Customer'}! Your order status has been updated.\n\n*Order ID:* ${tId}\n*Status:* ${o.status}\n\n*Items:*\n${itemLines}\n\n*Total Paid:* ₹${o.total}\n\n🔍 Track your order:\nhttps://dakshitha-pickles.vercel.app/track\nTracking ID: *${tId}*`;
+                    const waUrl = phone ? `https://wa.me/${phone}?text=${encodeURIComponent(waMsg)}` : null;
                     return (
                     <tr key={o._id}>
                       <td>
                         <div className="order-id" style={{color: 'var(--primary)', fontWeight: 'bold'}}>
-                          {o.trackingId || `DP-${o._id.slice(-4).toUpperCase()}`}
+                          {tId}
                         </div>
                         <div className="order-date">{new Date(o.createdAt).toLocaleDateString('en-IN')}</div>
                       </td>
-                      <td><div className="table-name">{o.billingDetails?.firstName} {o.billingDetails?.lastName}</div><div className="order-phone">📱 {o.billingDetails?.phone}</div></td>
-                      <td><div className="order-addr">{o.billingDetails?.streetAddress}, {o.billingDetails?.city}, {o.billingDetails?.state}</div></td>
-                      <td className="price-cell"><strong>₹{o.total}</strong></td>
+                      <td>
+                        <div className="table-name">{o.billingDetails?.firstName} {o.billingDetails?.lastName}</div>
+                        <div className="order-phone">📱 {o.billingDetails?.phone}</div>
+                        {o.billingDetails?.email && <div className="order-phone" style={{fontSize:'0.75rem',color:'#888'}}>✉️ {o.billingDetails.email}</div>}
+                      </td>
+                      <td><div className="order-addr">{o.billingDetails?.streetAddress}, {o.billingDetails?.city}, {o.billingDetails?.state} — {o.billingDetails?.pinCode}</div></td>
+                      <td><div className="order-items-mini">{(o.items||[]).map((it,i)=><div key={i} className="item-mini-row">🫙 {it.name} <span>({it.weight}) ×{it.quantity}</span></div>)}</div></td>
+                      <td className="price-cell">
+                        <strong>₹{o.total}</strong>
+                        {o.discount>0 && <div style={{fontSize:'0.75rem',color:'#16a34a'}}>−₹{o.discount} off</div>}
+                      </td>
                       <td><span className={`stock-pill ${o.paymentDetails?.isPaid ? 'in' : 'out'}`}>{o.paymentDetails?.isPaid ? '✓ Paid' : '⏳ Pending'}</span></td>
-                      <td><select value={o.status} onChange={(e) => handleUpdateOrderStatus(o._id, e.target.value)} className="status-select" style={{ borderColor: STATUS_COLORS[o.status] || '#ccc' }}>{['Ordered','Packed','Waiting for Transport','Out for Delivery','Delivered','Cancelled'].map(s => (<option key={s} value={s}>{s}</option>))}</select></td>
-                      <td><span style={{ fontSize: '0.82rem', color: waColor, fontWeight: '600' }}>{waIcon}</span></td>
+                      <td>
+                        <select value={o.status} onChange={(e) => handleUpdateOrderStatus(o._id, e.target.value)}
+                          className="status-select"
+                          style={{ borderColor: STATUS_COLORS[o.status]||'#ccc', background: (STATUS_COLORS[o.status]||'#888')+'18' }}>
+                          {['Ordered','Packed','Waiting for Transport','Out for Delivery','Delivered','Cancelled'].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td>
+                        <div style={{display:'flex',flexDirection:'column',gap:'6px',alignItems:'flex-start'}}>
+                          <span style={{fontSize:'0.78rem',color:waColor,fontWeight:'600'}}>{waIcon}</span>
+                          {waUrl && (
+                            <a href={waUrl} target="_blank" rel="noreferrer" className="wa-send-btn">
+                              📲 Send WA
+                            </a>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   )})}</tbody>
                 </table>

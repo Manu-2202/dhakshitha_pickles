@@ -274,3 +274,63 @@
   border-radius: 10px;
   padding: 14px 16px;
 }
+
+/* ── Missing class: success footer actions ── */
+.success-footer-actions {
+  text-align: center;
+  margin-top: 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+/* ── Error box styling ── */
+.checkout-error-box {
+  background: #fff4e5;
+  border: 1.5px solid #f59e0b;
+  border-radius: 16px;
+  padding: 20px 24px;
+  margin-bottom: 28px;
+  font-size: 0.9rem;
+  color: #92400e;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  position: relative;
+}
+.checkout-error-box h4 {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #78350f;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Checkout page better form inputs ── */
+.checkout-page .form-control {
+  border: 1.5px solid #e8ddd0;
+  border-radius: 10px;
+  padding: 11px 14px;
+  font-size: 0.92rem;
+  width: 100%;
+  color: #1e0a02;
+  background: #fdfcfa;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  outline: none;
+}
+.checkout-page .form-control:focus {
+  border-color: #da1f26;
+  box-shadow: 0 0 0 3px rgba(218,31,38,0.08);
+  background: white;
+}
+.checkout-page .form-group { margin-bottom: 18px; }
+.checkout-page .form-group label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #6b3a1f;
+  margin-bottom: 6px;
+}
+
